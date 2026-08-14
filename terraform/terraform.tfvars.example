@@ -1,0 +1,4 @@
+project_id  = "YOUR_PROJECT_ID"
+region      = "asia-south1"
+zone        = "asia-south1-a"
+environment = "dev"
