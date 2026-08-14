@@ -1,0 +1,144 @@
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: i27-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - i27-network
+
+
+  auth-service:
+    image: i27-helpdesk-auth:local
+    container_name: i27-auth
+    environment:
+      SERVER_PORT: "8081"
+      DB_JDBC_URL: "jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+      DB_USERNAME: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRY_MILLIS: ${JWT_EXPIRY_MILLIS}
+    ports:
+      - "8081:8081"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - i27-network
+
+
+  notification-service:
+    image: i27-helpdesk-notification:local
+    container_name: i27-notification
+    environment:
+      DATABASE_URL: "mysql+pymysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}"
+      AUTH_SERVICE_URL: "http://auth-service:8081"
+      TICKET_SERVICE_URL: "http://ticket-service:8082"
+      SMTP_HOST: "smtp.gmail.com"
+      SMTP_PORT: "587"
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+    ports:
+      - "8084:8084"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - i27-network
+
+
+  ticket-service:
+    image: i27-helpdesk-ticket:local
+    container_name: i27-ticket
+    environment:
+      SERVER_PORT: "8082"
+      DB_JDBC_URL: "jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+      DB_USERNAME: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      NOTIFICATION_SERVICE_URL: "http://notification-service:8084/notifications/event"
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "8082:8082"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      notification-service:
+        condition: service_started
+    networks:
+      - i27-network
+
+
+  comment-service:
+    image: i27-helpdesk-comment:local
+    container_name: i27-comment
+    environment:
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_NAME: ${MYSQL_DATABASE}
+      NOTIFICATION_URL: "http://notification-service:8084/notifications/event"
+      TICKET_SERVICE_URL: "http://ticket-service:8082/tickets"
+    ports:
+      - "8083:8083"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - i27-network
+
+
+  gateway:
+    image: i27-helpdesk-gateway:local
+    container_name: i27-gateway
+    environment:
+      SERVER_PORT: "8080"
+      UI_ORIGIN: "http://localhost:3000"
+      AUTH_SERVICE_URL: "http://auth-service:8081"
+      TICKET_SERVICE_URL: "http://ticket-service:8082"
+      COMMENT_SERVICE_URL: "http://comment-service:8083"
+      ATTACHMENT_SERVICE_URL: "http://attachment-service:8085"
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "8080:8080"
+    depends_on:
+      - auth-service
+      - ticket-service
+      - comment-service
+      - notification-service
+    networks:
+      - i27-network
+
+
+  ui:
+    image: i27-helpdesk-ui:local
+    container_name: i27-ui
+    ports:
+      - "3000:3000"
+    depends_on:
+      - gateway
+    networks:
+      - i27-network
+
+
+volumes:
+  mysql_data:
+
+
+networks:
+  i27-network:
+    driver: bridge

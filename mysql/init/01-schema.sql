@@ -1,0 +1,82 @@
+USE helpdesk_dev;
+
+CREATE TABLE IF NOT EXISTS users (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    full_name VARCHAR(255) NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS roles (
+    id INT NOT NULL AUTO_INCREMENT,
+    role_name VARCHAR(50) NOT NULL UNIQUE,
+    PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS user_roles (
+    user_id BIGINT NOT NULL,
+    role_id INT NOT NULL,
+    PRIMARY KEY (user_id, role_id)
+);
+
+INSERT IGNORE INTO roles (role_name)
+VALUES ('USER'), ('AGENT'), ('ADMIN');
+
+CREATE TABLE IF NOT EXISTS tickets (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    created_by BIGINT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    status VARCHAR(50) NOT NULL,
+    priority VARCHAR(50) NOT NULL,
+    assigned_to BIGINT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS ticket_activities (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    ticket_id BIGINT NOT NULL,
+    action VARCHAR(100) NOT NULL,
+    performed_by BIGINT NULL,
+    message TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS ticket_comments (
+    id INT NOT NULL AUTO_INCREMENT,
+    ticket_id BIGINT NOT NULL,
+    commented_by BIGINT NOT NULL,
+    commented_by_role VARCHAR(20) NOT NULL,
+    comment TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    ticket_id BIGINT NULL,
+    event_type VARCHAR(50) NOT NULL,
+    title VARCHAR(255),
+    message TEXT,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS notification_log (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    ticket_id BIGINT NULL,
+    notification_type ENUM('EMAIL') NULL,
+    recipient VARCHAR(255) NULL,
+    status ENUM('SENT','FAILED') NULL,
+    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+);
