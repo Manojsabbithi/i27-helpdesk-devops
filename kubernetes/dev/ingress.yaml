@@ -1,0 +1,59 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: i27-helpdesk-ingress
+  namespace: i27-helpdesk-dev
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "i27-helpdesk-ingress-ip"
+
+spec:
+  defaultBackend:
+    service:
+      name: ui
+      port:
+        number: 80
+
+  rules:
+    - http:
+        paths:
+
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway
+                port:
+                  number: 8080
+
+          - path: /tickets
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway
+                port:
+                  number: 8080
+
+          - path: /comments
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway
+                port:
+                  number: 8080
+
+          - path: /healthz
+            pathType: Exact
+            backend:
+              service:
+                name: gateway
+                port:
+                  number: 8080
+
+          - path: /readyz
+            pathType: Exact
+            backend:
+              service:
+                name: gateway
+                port:
+                  number: 8080
