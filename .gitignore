@@ -10,3 +10,9 @@ terraform/terraform.tfvars
 terraform/crash.log
 terraform/tfplan
 terraform/*.tfplan
+
+# Terraform bootstrap runtime files
+terraform/bootstrap/.terraform/
+terraform/bootstrap/*.tfstate
+terraform/bootstrap/*.tfstate.*
+terraform/bootstrap/*.tfplan
