@@ -1,0 +1,408 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: i27-helpdesk-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      containers:
+        - name: auth-service
+          image: asia-south1-docker.pkg.dev/i27-helpdesk-manoj-2026/i27-helpdesk/auth-service:v1
+          ports:
+            - containerPort: 8081
+          env:
+            - name: SERVER_PORT
+              value: "8081"
+            - name: DB_JDBC_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: i27-app-config
+                  key: DB_JDBC_URL
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: i27-app-config
+                  key: DB_HOST
+            - name: DB_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: i27-app-config
+                  key: DB_USERNAME
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: i27-app-secrets
+                  key: DB_PASSWORD
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: i27-app-secrets
+                  key: JWT_SECRET
+            - name: JWT_EXPIRY_MILLIS
+              valueFrom:
+                configMapKeyRef:
+                  name: i27-app-config
+                  key: JWT_EXPIRY_MILLIS
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "384Mi"
+            limits:
+              cpu: "500m"
+              memory: "768Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: i27-helpdesk-dev
+spec:
+  selector:
+    app: auth-service
+  ports:
+    - port: 8081
+      targetPort: 8081
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: i27-helpdesk-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+        - name: notification-service
+          image: asia-south1-docker.pkg.dev/i27-helpdesk-manoj-2026/i27-helpdesk/notification-service:v1
+          ports:
+            - containerPort: 8084
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: i27-app-secrets
+                  key: DATABASE_URL
+            - name: AUTH_SERVICE_URL
+              value: "http://auth-service:8081"
+            - name: TICKET_SERVICE_URL
+              value: "http://ticket-service:8082"
+            - name: SMTP_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: i27-app-secrets
+                  key: SMTP_HOST
+            - name: SMTP_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: i27-app-secrets
+                  key: SMTP_PORT
+            - name: SMTP_USER
+              valueFrom:
+                secretKeyRef:
+                  name: i27-app-secrets
+                  key: SMTP_USER
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: i27-app-secrets
+                  key: SMTP_PASSWORD
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8084
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8084
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  namespace: i27-helpdesk-dev
+spec:
+  selector:
+    app: notification-service
+  ports:
+    - port: 8084
+      targetPort: 8084
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ticket-service
+  namespace: i27-helpdesk-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ticket-service
+  template:
+    metadata:
+      labels:
+        app: ticket-service
+    spec:
+      containers:
+        - name: ticket-service
+          image: asia-south1-docker.pkg.dev/i27-helpdesk-manoj-2026/i27-helpdesk/ticket-service:v1
+          ports:
+            - containerPort: 8082
+          env:
+            - name: SERVER_PORT
+              value: "8082"
+            - name: DB_JDBC_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: i27-app-config
+                  key: DB_JDBC_URL
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: i27-app-config
+                  key: DB_HOST
+            - name: DB_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: i27-app-config
+                  key: DB_USERNAME
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: i27-app-secrets
+                  key: DB_PASSWORD
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: i27-app-secrets
+                  key: JWT_SECRET
+            - name: NOTIFICATION_SERVICE_URL
+              value: "http://notification-service:8084/notifications/event"
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: 8082
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8082
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8082
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "384Mi"
+            limits:
+              cpu: "500m"
+              memory: "768Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ticket-service
+  namespace: i27-helpdesk-dev
+spec:
+  selector:
+    app: ticket-service
+  ports:
+    - port: 8082
+      targetPort: 8082
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: comment-service
+  namespace: i27-helpdesk-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: comment-service
+  template:
+    metadata:
+      labels:
+        app: comment-service
+    spec:
+      containers:
+        - name: comment-service
+          image: asia-south1-docker.pkg.dev/i27-helpdesk-manoj-2026/i27-helpdesk/comment-service:v1
+          ports:
+            - containerPort: 8083
+          env:
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: i27-app-config
+                  key: DB_USERNAME
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: i27-app-secrets
+                  key: DB_PASSWORD
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: i27-app-config
+                  key: DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: i27-app-config
+                  key: DB_PORT
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: i27-app-config
+                  key: DB_NAME
+            - name: NOTIFICATION_URL
+              value: "http://notification-service:8084/notifications/event"
+            - name: TICKET_SERVICE_URL
+              value: "http://ticket-service:8082/tickets"
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8083
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8083
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: comment-service
+  namespace: i27-helpdesk-dev
+spec:
+  selector:
+    app: comment-service
+  ports:
+    - port: 8083
+      targetPort: 8083
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: i27-helpdesk-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+    spec:
+      containers:
+        - name: gateway
+          image: asia-south1-docker.pkg.dev/i27-helpdesk-manoj-2026/i27-helpdesk/gateway:v2
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SERVER_PORT
+              value: "8080"
+            - name: UI_ORIGIN
+              value: "*"
+            - name: AUTH_SERVICE_URL
+              value: "http://auth-service:8081"
+            - name: TICKET_SERVICE_URL
+              value: "http://ticket-service:8082"
+            - name: COMMENT_SERVICE_URL
+              value: "http://comment-service:8083"
+            - name: ATTACHMENT_SERVICE_URL
+              value: "http://attachment-service:8085"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: i27-app-secrets
+                  key: JWT_SECRET
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: i27-helpdesk-dev
+spec:
+  selector:
+    app: gateway
+  ports:
+    - port: 8080
+      targetPort: 8080
